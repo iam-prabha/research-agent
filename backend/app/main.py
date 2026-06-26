@@ -5,9 +5,9 @@ import uuid
 from contextlib import asynccontextmanager
 
 import redis.asyncio as redis
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi_limiter import FastAPILimiter
 from fastapi_limiter.depends import RateLimiter
 from pydantic import BaseModel, Field
@@ -30,8 +30,13 @@ INTERMEDIATE_STATUSES = ("planning", "searching", "extracting", "synthesizing", 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    redis_conn = redis.from_url(settings.redis_url)
-    await FastAPILimiter.init(redis_conn)
+    try:
+        _redis = redis.from_url(settings.redis_url)
+        await FastAPILimiter.init(_redis)
+    except Exception:
+        logging.warning("Redis unavailable — rate limiting disabled")
+        FastAPILimiter.redis = None
+        _redis = None
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
@@ -59,7 +64,8 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
     yield
-    await redis_conn.close()
+    if _redis:
+        await _redis.close()
 
 
 app = FastAPI(title="Research Agent", lifespan=lifespan)
@@ -78,11 +84,19 @@ async def global_exception_handler(request, exc):
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
-POST_LIMIT = [Depends(RateLimiter(times=10, minutes=1))]
-READ_LIMIT = [Depends(RateLimiter(times=30, minutes=1))]
+async def post_limit(request: Request, response: Response):
+    if FastAPILimiter.redis is None:
+        return
+    await RateLimiter(times=10, minutes=1)(request, response)
 
 
-@app.post("/api/research", dependencies=POST_LIMIT)
+async def read_limit(request: Request, response: Response):
+    if FastAPILimiter.redis is None:
+        return
+    await RateLimiter(times=30, minutes=1)(request, response)
+
+
+@app.post("/api/research", dependencies=[Depends(post_limit)])
 async def create_research(req: ResearchRequest):
     db = SessionLocal()
     try:
@@ -95,7 +109,7 @@ async def create_research(req: ResearchRequest):
         db.close()
 
 
-@app.get("/api/research/history", dependencies=READ_LIMIT)
+@app.get("/api/research/history", dependencies=[Depends(read_limit)])
 async def list_sessions():
     db = SessionLocal()
     try:
@@ -119,7 +133,7 @@ async def list_sessions():
         db.close()
 
 
-@app.get("/api/research/{session_id}", dependencies=READ_LIMIT)
+@app.get("/api/research/{session_id}", dependencies=[Depends(read_limit)])
 async def get_session(session_id: UUID4):
     db = SessionLocal()
     try:
@@ -143,7 +157,7 @@ async def get_session(session_id: UUID4):
         db.close()
 
 
-@app.delete("/api/research/{session_id}", dependencies=READ_LIMIT)
+@app.delete("/api/research/{session_id}", dependencies=[Depends(read_limit)])
 async def delete_session(session_id: UUID4):
     db = SessionLocal()
     try:
