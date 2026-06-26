@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useResearch, chainSSEToDispatch } from "../context/ResearchContext";
 import { connectResearchSSE } from "../api/sse";
+import { API_BASE } from "../api/api";
 
 export default function SearchForm() {
   const [query, setQuery] = useState("");
@@ -11,7 +12,7 @@ export default function SearchForm() {
     e.preventDefault();
     if (!query.trim() || disabled) return;
 
-    const res = await fetch("/api/research", {
+    const res = await fetch(`${API_BASE}/api/research`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: query.trim() }),

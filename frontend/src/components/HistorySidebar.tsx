@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useResearchState } from "../context/ResearchContext";
 import ConfirmDialog from "./ConfirmDialog";
+import { API_BASE } from "../api/api";
 
 interface Props {
   open: boolean;
@@ -23,7 +24,7 @@ export default function HistorySidebar({ open, onToggle }: Props) {
   const { sessionId, phase } = useResearchState();
 
   const fetchHistory = useCallback(async () => {
-    const res = await fetch("/api/research/history");
+    const res = await fetch(`${API_BASE}/api/research/history`);
     const data: HistoryEntry[] = await res.json();
     setHistory(data);
   }, []);
@@ -40,7 +41,7 @@ export default function HistorySidebar({ open, onToggle }: Props) {
     setDeletingId(null);
     setHistory((prev) => prev.filter((e) => e.id !== id));
     if (sessionId === id) navigate("/");
-    await fetch(`/api/research/${id}`, { method: "DELETE" });
+    await fetch(`${API_BASE}/api/research/${id}`, { method: "DELETE" });
   }
 
   function loadSession(entry: HistoryEntry) {

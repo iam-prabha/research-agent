@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import Markdown from "react-markdown";
+import { API_BASE } from "../api/api";
 
 
 interface SessionData {
@@ -82,7 +83,7 @@ export default function ReportPage() {
     if (!sessionId) return;
     setLoading(true);
     setError(null);
-      fetch(`/api/research/${sessionId}`)
+      fetch(`${API_BASE}/api/research/${sessionId}`)
       .then((r) => {
         if (!r.ok) throw new Error("Session not found");
         return r.json();

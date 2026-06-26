@@ -1,3 +1,5 @@
+import { API_BASE } from "./api";
+
 export type SSEEvent =
   | { event: "status"; data: { node: string } }
   | { event: "warning"; data: { message: string } }
@@ -13,7 +15,7 @@ export function connectResearchSSE(
   onEvent: EventCallback,
   onError?: (err: Error) => void,
 ): () => void {
-  const url = `/api/research/${sessionId}/stream`;
+  const url = `${API_BASE}/api/research/${sessionId}/stream`;
   const source = new EventSource(url);
   let settled = false;
 
